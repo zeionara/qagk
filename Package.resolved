@@ -1,0 +1,43 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "CBLAS-Linux",
+        "repositoryURL": "https://github.com/indisoluble/CBLAS-Linux.git",
+        "state": {
+          "branch": null,
+          "revision": "46b67dc60adde8682f3342ca474605a12cd79867",
+          "version": "1.0.0"
+        }
+      },
+      {
+        "package": "swift-argument-parser",
+        "repositoryURL": "https://github.com/zeionara/swift-argument-parser.git",
+        "state": {
+          "branch": "main",
+          "revision": "544d566a1434bc2bcfd0d6c3007d1904fa00d84a",
+          "version": null
+        }
+      },
+      {
+        "package": "swift-numerics",
+        "repositoryURL": "https://github.com/apple/swift-numerics.git",
+        "state": {
+          "branch": null,
+          "revision": "6b24333510e9044cf4716a07bed65eeed6bc6393",
+          "version": "0.0.8"
+        }
+      },
+      {
+        "package": "SwiftQuantumComputing",
+        "repositoryURL": "https://github.com/zeionara/SwiftQuantumComputing.git",
+        "state": {
+          "branch": "master",
+          "revision": "68494a40b214fd5a5dd02d139d6cadfaa9d354da",
+          "version": null
+        }
+      }
+    ]
+  },
+  "version": 1
+}
