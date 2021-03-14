@@ -30,17 +30,17 @@ struct Test: ParsableCommand {
     mutating func run(_ result: inout [String: Any]) throws {
         print("Running \(self.algorithm) algorithm...")
         let graph: Graph = [
-            (0, 1),
-            (0, 2),
-            (1, 3),
-            (2, 4)
+            (0, 1)
+            // (0, 2),
+            // (1, 3),
+            // (2, 4)
         ]
         // let graph: Graph = [
         //     (0, 1),
         //     (0, 2)
         // ]
-        let colorizer = try makeGraphColorizer(graph)
-        colorizer.summarize()
+        let colorizer = NGraphColorizer(graph) // try makeGraphColorizer(graph)
+        try print(colorizer.run().groupedProbabilities(byQubits: [0, 1, 2, 3, 4, 5, 14]).get().keys.sorted())
         // print(colorizer.run().summarizedProbabilities())
     }
 }
