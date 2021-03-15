@@ -29,18 +29,35 @@ struct Test: ParsableCommand {
 
     mutating func run(_ result: inout [String: Any]) throws {
         print("Running \(self.algorithm) algorithm...")
-        let graph: Graph = [
-            (0, 1)
-            // (0, 2),
-            // (1, 3),
-            // (2, 4)
-        ]
+        
+        let dimensionality = 6
+        let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
+        print(embedder.run().groupedProbabilities(byQubits: 0..<dimensionality))
+        
+        // let identity = try! Matrix(
+        //     [[.one, .zero],
+        //     [.zero, .one]]k
+        // )
+
+        // let inverse = try! Matrix(
+        //     [[.zero, .one],
+        //     [.one, .zero]]
+        // )
+
+        // Matrix.kronekerProduct(lhs: identity, rhs: inverse)
+        
+        // let graph: Graph = [
+        //     (0, 1)
+        //     // (0, 2),
+        //     // (1, 3),
+        //     // (2, 4)
+        // ]
         // let graph: Graph = [
         //     (0, 1),
         //     (0, 2)
         // ]
-        let colorizer = NGraphColorizer(graph) // try makeGraphColorizer(graph)
-        try print(colorizer.run().groupedProbabilities(byQubits: [0, 1, 2, 3, 4, 5, 14]).get().keys.sorted())
+        // let colorizer = NGraphColorizer(graph) // try makeGraphColorizer(graph)
+        // try print(colorizer.run().groupedProbabilities(byQubits: [0, 1, 2, 3, 4, 5, 14]).get().keys.sorted())
         // print(colorizer.run().summarizedProbabilities())
     }
 }
