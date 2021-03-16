@@ -32,7 +32,7 @@ struct Test: ParsableCommand {
         
         let dimensionality = 6
         let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
-        print(embedder.run(subject: 17).groupedProbabilities(byQubits: 0..<dimensionality))
+        print(embedder.run(subject: 17, object: 19).groupedProbabilities(byQubits: 0..<dimensionality))
         
         // let identity = try! Matrix(
         //     [[.one, .zero],

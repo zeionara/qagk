@@ -357,10 +357,15 @@ class QuantumGraphEmbedder {
         )
     }
 
-    func run(subject: Int) -> CircuitStatevector {
+    func getObjectMatrix(object: Int) -> Matrix {
+        return makeIdentity(
+            self.nQubits
+        )
+    }
+
+    func run(subject: Int, object: Int) -> CircuitStatevector {
         let U1 = Matrix.multiply(lhs: getSubjectMatrix(subject: subject), rhs: predicate)
-        print("--")
-        print(Matrix.multiply(lhs: U1, rhs: U1, rhsTrans: CblasConjTrans))
+        let U2 = getObjectMatrix(object: object)
         let gates: [Gate] = [
             .hadamard(target: 0),
             .controlled(
@@ -369,7 +374,17 @@ class QuantumGraphEmbedder {
                     inputs: (1...nQubits).map{$0}
                 ),
                 controls: [0]
-            )
+            ),
+            .not(target: 0),
+            .controlled(
+                gate: .matrix(
+                    matrix: U2,
+                    inputs: (1...nQubits).map{$0}
+                ),
+                controls: [0]
+            ),
+            .not(target: 0),
+            .hadamard(target: 0)
         ]
         let circuit = MainCircuitFactory().makeCircuit(gates: gates)
         return try! circuit.statevector().get()
