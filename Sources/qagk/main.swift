@@ -30,7 +30,7 @@ struct Test: ParsableCommand {
     mutating func run(_ result: inout [String: Any]) throws {
         print("Running \(self.algorithm) algorithm...")
         
-        let dimensionality = 2
+        let dimensionality = 6
         let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
         print(embedder.run(subject: 17).groupedProbabilities(byQubits: 0..<dimensionality))
         
