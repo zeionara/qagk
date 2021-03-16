@@ -30,19 +30,21 @@ struct Test: ParsableCommand {
     mutating func run(_ result: inout [String: Any]) throws {
         print("Running \(self.algorithm) algorithm...")
         
-        let dimensionality = 6
+        let dimensionality = 2
         let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
-        print(embedder.run().groupedProbabilities(byQubits: 0..<dimensionality))
+        print(embedder.run(subject: 17).groupedProbabilities(byQubits: 0..<dimensionality))
         
         // let identity = try! Matrix(
         //     [[.one, .zero],
-        //     [.zero, .one]]k
+        //     [.zero, .one]]
         // )
 
         // let inverse = try! Matrix(
         //     [[.zero, .one],
         //     [.one, .zero]]
         // )
+
+        // print(Matrix.kronekerProduct(matrices: [P1, inverse]) + Matrix.kronekerProduct(matrices: [P0, identity]))
 
         // Matrix.kronekerProduct(lhs: identity, rhs: inverse)
         

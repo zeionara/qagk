@@ -2,6 +2,44 @@ import SwiftQuantumComputing
 import Foundation
 import ComplexModule
 
+#if os(Linux)
+
+import CBLAS_Linux
+
+#else
+
+import Accelerate
+
+#endif
+
+let IDENTITY = try! Matrix(
+    [
+        [.one, .zero],
+        [.zero, .one]
+    ]
+)
+
+let FLIP = try! Matrix(
+    [
+        [.zero, .one],
+        [.one, .zero]
+    ]
+)
+
+let P1 = try! Matrix(
+    [
+        [.zero, .zero],
+        [.zero, .one]
+    ]
+)
+
+let P0 = try! Matrix(
+    [
+        [.one, .zero],
+        [.zero, .zero]
+    ]
+)
+
 public extension Matrix {
     static func kronekerProduct(lhs: Matrix, rhs: Matrix) -> Matrix { // -> [[Complex]]
         var rows: [[Complex<Double>]] = []
@@ -25,6 +63,22 @@ public extension Matrix {
         //     }
         // }
         // print(lhs.values)
+    }
+    
+    static func kronekerProduct(matrices: [Matrix]) -> Matrix {
+        var product: Matrix = matrices.last!
+        for i in (0..<matrices.count - 1).reversed() {
+            product = Matrix.kronekerProduct(lhs: matrices[i], rhs: product) 
+        }
+        return product
+    }
+
+    static func multiply(matrices: [Matrix]) -> Matrix {
+        var product: Matrix = matrices.first!
+        for i in 1..<matrices.count {
+            product = try! (product * matrices[i]).get()
+        }
+        return product
     }
 }
 
@@ -61,11 +115,85 @@ func getControllingQubit(targetQubit: Int, nQubits: Int, offset: Int) -> Int {
     return controlledQubit
 }
 
+func getExtendedMatrix(layers: [[ParameterizedGate]], layer: Int, targetQubit: Int, controllingQubit: Optional<Int> = .none) -> Matrix {
+    if let controllingQubitUnwrapped = controllingQubit {
+        return try! (
+                Matrix.kronekerProduct(
+                matrices: (0..<layers[layer].count).map{i -> Matrix in
+                    if i == targetQubit {
+                        return layers[layer][i].matrix
+                    } else if i == controllingQubitUnwrapped {
+                        return P1
+                    } else {
+                        return IDENTITY
+                    }
+                }
+            ) + Matrix.kronekerProduct(
+                matrices: (0..<layers[layer].count).map{i -> Matrix in
+                    if i == controllingQubitUnwrapped {
+                        return P0
+                    } else {
+                        return IDENTITY
+                    }
+                }
+            )
+        ).get()
+    } else {
+        return Matrix.kronekerProduct(
+            matrices: (0..<layers[layer].count).map{i -> Matrix in
+                if i == targetQubit {
+                    return layers[layer][i].matrix
+                } else {
+                    return IDENTITY
+                }
+            }
+        )
+    }
+}
+
+func makeIdentity(_ nQubits: Int) -> Matrix {
+    return try! Matrix(
+        (0..<Int(truncating: NSDecimalNumber(decimal: pow(2, nQubits)))).map{i in
+            (0..<Int(truncating: NSDecimalNumber(decimal: pow(2, nQubits)))).map{j in
+                return j == i ? .one : .zero
+            }
+        }
+    )
+}
+
+func getLayerMatrix(layers: [[ParameterizedGate]], layer: Int, offset: Optional<Int> = .none) -> Matrix {
+    let nQubits = layers[layer].count
+    var product = makeIdentity(nQubits)
+    for i in 0..<nQubits {
+        var controllingQubit: Optional<Int> = .none
+        if let offsetUnwrapped = offset {
+            controllingQubit = getControllingQubit(
+                targetQubit: i,
+                nQubits: nQubits,
+                offset: offsetUnwrapped
+            )
+        }
+        let extendedMatrix = getExtendedMatrix(
+            layers: layers,
+            layer: layer,
+            targetQubit: i,
+            controllingQubit: controllingQubit
+        )
+        // print(extendedMatrix)
+        product = try! (
+            product * extendedMatrix
+        ).get()
+    }
+    return product
+}
+
 class QuantumGraphEmbedder {
     // public let graph: Graph
     public let circuit: Circuit
     public let nQubits: Int
     public let gates: [Gate]
+    public let predicate: Matrix
+    public let parameterizedGates: [[ParameterizedGate]]
 
     public init(dimensionality nQubits: Int) {
         // Initialize optimized parameters
@@ -106,11 +234,28 @@ class QuantumGraphEmbedder {
         }
         print("First layer")
         addLayer(offset: 0)
-        var product: Matrix = parameterizedGates.last!.last!.matrix
-        for i in (0..<nQubits - 1).reversed() {
-            product = Matrix.kronekerProduct(lhs: parameterizedGates.last![i].matrix, rhs: product) 
-        }
-        print(product)
+        addLayer(offset: 1)
+        // print(getExtendedMatrix(layers: parameterizedGates, layer: 0, targetQubit: 1))
+        // print(getExtendedMatrix(layers: parameterizedGates, layer: 0, targetQubit: 1, controllingQubit: 0))
+        
+        // print(getLayerMatrix(layers: parameterizedGates, layer: 0))
+        // print(getLayerMatrix(layers: parameterizedGates, layer: 0, offset: -1))
+        // print(getLayerMatrix(layers: parameterizedGates, layer: 0, offset: -2))
+        // print(getLayerMatrix(layers: parameterizedGates, layer: 0, offset: -3))
+        self.predicate = Matrix.multiply(
+            matrices: [
+                getLayerMatrix(layers: parameterizedGates, layer: 0),
+                getLayerMatrix(layers: parameterizedGates, layer: 0, offset: -1),
+                getLayerMatrix(layers: parameterizedGates, layer: 0, offset: -2),
+                getLayerMatrix(layers: parameterizedGates, layer: 0, offset: -3)
+            ]
+        )
+        // var product: Matrix = parameterizedGates.last!.last!.matrix
+        // for i in (0..<nQubits - 1).reversed() {
+
+        //     // product = Matrix.kronekerProduct(lhs: parameterizedGates.last![i].matrix, rhs: product) 
+        // }
+        // print(product)
         // print("Second layer")
         // addLayer(offset: 1)
         // print("Third layer")
@@ -157,10 +302,31 @@ class QuantumGraphEmbedder {
         self.gates = gates
         self.circuit = MainCircuitFactory().makeCircuit(gates: gates)
         self.nQubits = nQubits
+        self.parameterizedGates = parameterizedGates
     }
 
-    func run() -> CircuitStatevector {
-        let statevector = try! circuit.statevector().get()
-        return statevector
+    func getSubjectMatrix(subject: Int) -> Matrix {
+        return makeIdentity(
+            self.nQubits
+        )
+    }
+
+    func run(subject: Int) -> CircuitStatevector {
+        let U1 = try! (parameterizedGates[0][0].matrix * IDENTITY).get() // try! (getSubjectMatrix(subject: subject) * predicate).get()
+        print("--")
+        print(Matrix.multiply(lhs: U1, rhs: U1, rhsTrans: CblasConjTrans))
+        let gates: [Gate] = [
+            .controlled(
+                gate: .matrix(
+                    matrix: U1,
+                    inputs: (1...nQubits).map{$0}
+                ),
+                controls: [0]
+            )
+        ]
+        let circuit = MainCircuitFactory().makeCircuit(gates: gates)
+        return try! circuit.statevector().get()
+        // let statevector = try! circuit.statevector().get()
+        // return statevector
     }
 }
