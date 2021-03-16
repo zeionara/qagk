@@ -74,8 +74,9 @@ func prepareQubitStates(coefficients: [Double]) -> Matrix {
         print(firstQubitInverse)
         print(resultR)
         print(resultL)
-        print(Matrix.multiply(matrices: [firstQubitResult, resultR]))
-        return Matrix.multiply(matrices: [firstQubitResult, resultR])
+        print(firstQubitResult, resultR)
+        print(Matrix.multiply(lhs: resultR, rhs: firstQubitResult))
+        return Matrix.multiply(matrices: [resultL, resultR, firstQubitResult])
     }
     return IDENTITY
 }
