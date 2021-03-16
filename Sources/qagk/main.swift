@@ -2,6 +2,16 @@ import ArgumentParser
 import SwiftQuantumComputing
 import TensorFlow
 
+#if os(Linux)
+
+import CBLAS_Linux
+
+#else
+
+import Accelerate
+
+#endif
+
 enum AlgorithmError: Error {
     case unsupportedAlgorithm(message: String)
 }
@@ -29,10 +39,31 @@ struct Test: ParsableCommand {
 
     mutating func run(_ result: inout [String: Any]) throws {
         print("Running \(self.algorithm) algorithm...")
-        
-        let dimensionality = 6
-        let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
-        print(embedder.run(subject: 17, object: 19).groupedProbabilities(byQubits: 0..<dimensionality))
+
+        // let state = prepareOneQubitState(zeroCoefficient: 0.3, oneCoefficient: 0.7)
+        let state = prepareQubitStates(coefficients: [0.5, 0.5, sqrt(0.2), sqrt(0.3)])
+        // print(
+        //    print(Matrix.multiply(lhs: state, rhs: state, rhsTrans: CblasConjTrans))
+        // )
+
+        let circuit = MainCircuitFactory().makeCircuit(
+            gates: [
+                .matrix(
+                    matrix: state, // prepareOneQubitState(zeroCoefficient: 0.5, oneCoefficient: 0.5),
+                    inputs: [0, 1]
+                )
+            ]
+        )
+
+
+
+
+        try! print(circuit.statevector().get().summarizedProbabilities())
+
+
+        // let dimensionality = 6
+        // let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
+        // print(embedder.run(subject: 17, object: 19).groupedProbabilities(byQubits: 0..<dimensionality))
         
         // let identity = try! Matrix(
         //     [[.one, .zero],

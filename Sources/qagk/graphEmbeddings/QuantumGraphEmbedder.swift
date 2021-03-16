@@ -250,7 +250,7 @@ class QuantumGraphEmbedder {
         func addLayer(offset: Int) {
             var firstLayerGates: [ParameterizedGate] = [] 
             for i in 0...nQubits-1 {
-                var gate = ParameterizedGate()
+                let gate = ParameterizedGate()
                 gates.append(
                     offset == 0 ? .matrix(
                         matrix: gate.matrix, inputs: [i]
