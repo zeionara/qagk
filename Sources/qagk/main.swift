@@ -58,7 +58,8 @@ struct Test: ParsableCommand {
 
 
 
-        try! print(circuit.statevector().get().summarizedProbabilities())
+        try! print(circuit.statevector().get().vector)
+        // try! print(circuit.statevector().get().summarizedProbabilities())
 
 
         // let dimensionality = 6
