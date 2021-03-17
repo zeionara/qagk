@@ -41,7 +41,7 @@ struct Test: ParsableCommand {
         print("Running \(self.algorithm) algorithm...")
 
         // let state = prepareOneQubitState(zeroCoefficient: 0.3, oneCoefficient: 0.7)
-        let state = prepareQubitStates(coefficients: [0.5, 0.5, sqrt(0.2), sqrt(0.3)])
+        let state = prepareQubitStates(coefficients: [0.15, 0.13, 0.12, 0.16, 0.11, 0.17, 0.07, 0.09])
         // print(
         //    print(Matrix.multiply(lhs: state, rhs: state, rhsTrans: CblasConjTrans))
         // )
@@ -50,7 +50,7 @@ struct Test: ParsableCommand {
             gates: [
                 .matrix(
                     matrix: state, // prepareOneQubitState(zeroCoefficient: 0.5, oneCoefficient: 0.5),
-                    inputs: [0, 1]
+                    inputs: [0, 1, 2]
                 )
             ]
         )

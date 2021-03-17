@@ -19,6 +19,15 @@ let IDENTITY = try! Matrix(
     ]
 )
 
+let CNOT = try! Matrix(
+    [
+        [.one, .zero, .zero, .zero],
+        [.zero, .one, .zero, .zero],
+        [.zero, .zero, .zero, .one],
+        [.zero, .zero, .one, .zero]
+    ]
+)
+
 let FLIP = try! Matrix(
     [
         [.zero, .one],
@@ -101,6 +110,10 @@ public extension Matrix {
             product = Matrix.multiply(lhs: product, rhs: matrices[i])
         }
         return product
+    }
+
+    static func stackAsGates(_ matrices: [Matrix]) -> Matrix {
+        return multiply(matrices: matrices.reversed())
     }
 }
 
