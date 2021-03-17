@@ -298,8 +298,8 @@ class QuantumGraphEmbedder {
         // print(getLayerMatrix(layers: parameterizedGates, layer: 0, offset: -2))
         // print(getLayerMatrix(layers: parameterizedGates, layer: 0, offset: -3))
         // self.predicate = getLayerMatrix(layers: parameterizedGates, layer: 0)
-        self.predicate = Matrix.multiply(
-            matrices: [
+        self.predicate = Matrix.stackAsGates(
+            [
                 getLayerMatrix(layers: parameterizedGates, layer: 0),
                 getLayerMatrix(layers: parameterizedGates, layer: 1, offset: -1),
                 getLayerMatrix(layers: parameterizedGates, layer: 2, offset: -2),
@@ -376,9 +376,9 @@ class QuantumGraphEmbedder {
         )
     }
 
-    func run(subject: Int, object: Int) -> CircuitStatevector {
-        let U1 = Matrix.multiply(lhs: getSubjectMatrix(subject: subject), rhs: predicate)
-        let U2 = getObjectMatrix(object: object)
+    func run(subject: [Double], object: [Double]) -> CircuitStatevector {
+        let U1 = Matrix.multiply(lhs: prepareQubitStates(coefficients: subject), rhs: predicate)
+        let U2 = prepareQubitStates(coefficients: object)
         let gates: [Gate] = [
             .hadamard(target: 0),
             .controlled(

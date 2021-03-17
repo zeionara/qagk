@@ -41,30 +41,42 @@ struct Test: ParsableCommand {
         print("Running \(self.algorithm) algorithm...")
 
         // let state = prepareOneQubitState(zeroCoefficient: 0.3, oneCoefficient: 0.7)
-        let state = prepareQubitStates(coefficients: [0.15, 0.13, 0.12, 0.16, 0.11, 0.17, 0.07, 0.09])
+        // let state = prepareQubitStates(coefficients: [0.15, 0.13, 0.12, 0.16, 0.11, 0.17, 0.07, 0.09])
+
+        // print(subject.asProbabilities)
+        // let state = prepareQubitStates(coefficients: subject.asProbabilities)
+
         // print(
         //    print(Matrix.multiply(lhs: state, rhs: state, rhsTrans: CblasConjTrans))
         // )
 
-        let circuit = MainCircuitFactory().makeCircuit(
-            gates: [
-                .matrix(
-                    matrix: state, // prepareOneQubitState(zeroCoefficient: 0.5, oneCoefficient: 0.5),
-                    inputs: [0, 1, 2]
-                )
-            ]
-        )
+        // let circuit = MainCircuitFactory().makeCircuit(
+        //     gates: [
+        //         .matrix(
+        //             matrix: state, // prepareOneQubitState(zeroCoefficient: 0.5, oneCoefficient: 0.5),
+        //             inputs: [0, 1, 2, 3, 4, 5]
+        //         )
+        //     ]
+        // )
 
 
 
 
-        try! print(circuit.statevector().get().vector)
+        // try! print(circuit.statevector().get().vector)
         // try! print(circuit.statevector().get().summarizedProbabilities())
-
-
-        // let dimensionality = 6
-        // let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
-        // print(embedder.run(subject: 17, object: 19).groupedProbabilities(byQubits: 0..<dimensionality))
+        let dimensionality = 7
+        let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
+        let subject: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
+        let object: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
+        print(
+            embedder.run(
+                subject: subject,
+                object: object
+            ).vector
+        )
+        // .groupedProbabilities(
+        //         byQubits: 0..<dimensionality
+        //     )
         
         // let identity = try! Matrix(
         //     [[.one, .zero],
