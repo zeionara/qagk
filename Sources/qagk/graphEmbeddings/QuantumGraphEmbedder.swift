@@ -12,6 +12,12 @@ import Accelerate
 
 #endif
 
+enum OptimizedParameter {
+    case alpha
+    case beta
+    case gamma
+}
+
 let IDENTITY = try! Matrix(
     [
         [.one, .zero],
@@ -115,6 +121,14 @@ public extension Matrix {
     static func stackAsGates(_ matrices: [Matrix]) -> Matrix {
         return multiply(matrices: matrices.reversed())
     }
+
+    var unitary: Matrix {
+        // let unscaledMatrix = try! (makeSubmatrix(gamma: 0) + makeSubmatrix(gamma: Double.pi)).get()
+        let squaredMatrix = Matrix.multiply(lhs: self, rhs: self, rhsTrans: CblasConjTrans)
+        // print(1 / squaredMatrix[0, 0])
+        let scaledMatrix = Matrix.scale(lhs: self, x: Complex<Double>(1 / sqrt(squaredMatrix[0, 0].real), squaredMatrix[0, 0].imaginary))
+        return scaledMatrix
+    }
 }
 
 class ParameterizedGate{
@@ -130,10 +144,71 @@ class ParameterizedGate{
 
     public var matrix: Matrix {
         let matrix = try! Matrix(
-            [[Complex(cos(beta)*cos(alpha), sin(beta)*cos(alpha)), Complex(cos(gamma)*sin(alpha), sin(gamma)*sin(alpha))],
-            [Complex(-cos(gamma)*sin(alpha), sin(gamma)*sin(alpha)), Complex(cos(beta)*cos(alpha), -sin(beta)*cos(alpha))]]
+            [
+                [Complex(cos(beta)*cos(alpha), sin(beta)*cos(alpha)), Complex(cos(gamma)*sin(alpha), sin(gamma)*sin(alpha))],
+                [Complex(-cos(-gamma)*sin(alpha), -sin(-gamma)*sin(alpha)), Complex(cos(-beta)*cos(alpha), sin(-beta)*cos(alpha))]
+            ]
         )
-        // print((matrix.krone
+        return matrix
+    }
+
+    public var alphaDerivativeMatrix: Matrix {
+        let matrix = try! Matrix(
+            [
+                [Complex(cos(beta)*cos(alpha + Double.pi/2), sin(beta)*cos(alpha + Double.pi/2)), Complex(cos(gamma)*sin(alpha + Double.pi/2), sin(gamma)*sin(alpha + Double.pi/2))],
+                [Complex(-cos(-gamma)*sin(alpha + Double.pi/2), -sin(-gamma)*sin(alpha + Double.pi/2)), Complex(cos(-beta)*cos(alpha + Double.pi/2), sin(-beta)*cos(alpha + Double.pi/2))]
+            ]
+        )
+        return matrix
+    }
+
+    public var betaDerivativeMatrix: Matrix {
+        func makeSubmatrix(gamma: Double) -> Matrix {
+            let matrix = try! Matrix(
+                [
+                    [Complex(cos(beta + Double.pi/2)*cos(alpha), sin(beta + Double.pi/2)*cos(alpha)), Complex(cos(gamma)*sin(alpha), sin(gamma)*sin(alpha))],
+                    [Complex(-cos(-gamma)*sin(alpha), -sin(-gamma)*sin(alpha)), Complex(cos(-(beta + Double.pi/2))*cos(alpha), sin(-(beta + Double.pi/2))*cos(alpha))]
+                ]
+            )
+            return matrix
+            // return Matrix.scale(lhs: matrix, x: Complex<Double>(1 / 1.8))
+        }
+        // return makeSubmatrix(gamma: 0)
+        // let unscaledMatrix = try! (makeSubmatrix(gamma: 0) + makeSubmatrix(gamma: Double.pi)).get()
+        // let squaredMatrix = Matrix.multiply(lhs: unscaledMatrix, rhs: unscaledMatrix, rhsTrans: CblasConjTrans)
+        // print(1 / squaredMatrix[0, 0])
+        // let scaledMatrix = Matrix.scale(lhs: unscaledMatrix, x: Complex<Double>(1 / sqrt(squaredMatrix[0, 0].real), squaredMatrix[0, 0].imaginary))
+        return try! (makeSubmatrix(gamma: 0) + makeSubmatrix(gamma: Double.pi)).get().unitary // scaledMatrix
+    }
+
+    public var gammaDerivativeMatrix: Matrix {
+        func makeSubmatrix(beta: Double) -> Matrix {
+            let matrix = try! Matrix(
+                [
+                    [Complex(cos(beta)*cos(alpha), sin(beta)*cos(alpha)), Complex(cos(gamma + Double.pi/2)*sin(alpha), sin(gamma + Double.pi/2)*sin(alpha))],
+                    [Complex(-cos(-(gamma + Double.pi/2))*sin(alpha), -sin(-(gamma + Double.pi/2))*sin(alpha)), Complex(cos(-beta)*cos(alpha), sin(-beta)*cos(alpha))]
+                ]
+            )
+            return matrix
+            // return Matrix.scale(lhs: matrix, x: Complex<Double>(1 / 1.8))
+        }
+        // return makeSubmatrix(gamma: 0)
+        // let unscaledMatrix = try! (makeSubmatrix(gamma: 0) + makeSubmatrix(gamma: Double.pi)).get()
+        // let squaredMatrix = Matrix.multiply(lhs: unscaledMatrix, rhs: unscaledMatrix, rhsTrans: CblasConjTrans)
+        // print(1 / squaredMatrix[0, 0])
+        // let scaledMatrix = Matrix.scale(lhs: unscaledMatrix, x: Complex<Double>(1 / sqrt(squaredMatrix[0, 0].real), squaredMatrix[0, 0].imaginary))
+        return try! (makeSubmatrix(beta: 0) + makeSubmatrix(beta: Double.pi)).get().unitary // scaledMatrix
+    }
+
+    public func getDerivativeMatrix(_ optimizedParameter: OptimizedParameter) -> Matrix {
+        print("Getting derivative matrix...")
+        if optimizedParameter == .alpha {
+            return alphaDerivativeMatrix
+        } else if optimizedParameter == .beta {
+            return betaDerivativeMatrix
+        } else if optimizedParameter == .gamma {
+            return gammaDerivativeMatrix
+        }
         return matrix
     }
 
@@ -199,6 +274,55 @@ func getExtendedMatrix(layers: [[ParameterizedGate]], layer: Int, targetQubit: I
     }
 }
 
+func getExtendedDerivativeMatrix(layers: [[ParameterizedGate]], layer: Int, targetQubit: Int, parameter: OptimizedParameter,  controllingQubit: Optional<Int> = .none) -> Matrix {
+    if let controllingQubitUnwrapped = controllingQubit {
+        let p1Part = Matrix.kronekerProduct(
+            matrices: (0..<layers[layer].count).map{i -> Matrix in
+                if i == targetQubit {
+                    return layers[layer][i].matrix
+                } else if i == controllingQubitUnwrapped {
+                    return P1
+                } else {
+                    return IDENTITY
+                }
+            }
+        )
+        // print(Matrix.kronekerProduct(lhs: P0, rhs: IDENTITY))
+        // print(Matrix.kronekerProduct(lhs: IDENTITY, rhs: P0))
+        // print(controllingQubitUnwrapped)
+        // print("P1")
+        // print(p1Part)
+        let p0Part = Matrix.kronekerProduct(
+            matrices: (0..<layers[layer].count).map{i -> Matrix in
+                if i == controllingQubitUnwrapped {
+                    return P0
+                } else {
+                    return IDENTITY
+                }
+            }
+        )
+        // print("P0")
+        // print(p0Part)
+        let result = try! (
+            p1Part + p0Part
+        ).get()
+        // result = Matrix.scale(lhs: result, x: Complex<Double>(1/1.22, 0))
+        // print("?????????")
+        // print(result)
+        return result
+    } else {
+        return Matrix.kronekerProduct(
+            matrices: (0..<layers[layer].count).map{i -> Matrix in
+                if i == targetQubit {
+                    return layers[layer][i].getDerivativeMatrix(parameter)
+                } else {
+                    return IDENTITY
+                }
+            }
+        )
+    }
+}
+
 func makeIdentity(_ nQubits: Int) -> Matrix {
     return try! Matrix(
         (0..<Int(truncating: NSDecimalNumber(decimal: pow(2, nQubits)))).map{i in
@@ -234,6 +358,40 @@ func getLayerMatrix(layers: [[ParameterizedGate]], layer: Int, offset: Optional<
         // print(product)
         // print(Matrix.multiply(lhs: extendedMatrix, rhs: extendedMatrix, rhsTrans: CblasConjTrans))
         // print(Matrix.multiply(lhs: product, rhs: product, rhsTrans: CblasConjTrans))
+    }
+    // print("=======================================================================")
+    // print(Matrix.multiply(lhs: product, rhs: product, rhsTrans: CblasConjTrans))
+    return product
+}
+
+func getGateDerivativeMatrix(layers: [[ParameterizedGate]], layer: Int, parameter: OptimizedParameter, qubit: Optional<Int> = .none, offset: Optional<Int> = .none) -> Matrix {
+    let nQubits = layers[layer].count
+    var product = makeIdentity(nQubits)
+    if let unwrappedQubit = qubit {
+        for i in 0..<nQubits {
+            var controllingQubit: Optional<Int> = .none
+            if let offsetUnwrapped = offset {
+                controllingQubit = getControllingQubit(
+                    targetQubit: i,
+                    nQubits: nQubits,
+                    offset: offsetUnwrapped
+                )
+            }
+            let extendedMatrix = i == unwrappedQubit ? getExtendedDerivativeMatrix(
+                layers: layers,
+                layer: layer,
+                targetQubit: i,
+                parameter: parameter,
+                controllingQubit: controllingQubit
+            ) : makeIdentity(nQubits)
+            // print(extendedMatrix)
+            product = Matrix.multiply(lhs: product, rhs: extendedMatrix)
+            // print("=======================================================================")
+            // print(extendedMatrix)
+            // print(product)
+            // print(Matrix.multiply(lhs: extendedMatrix, rhs: extendedMatrix, rhsTrans: CblasConjTrans))
+            // print(Matrix.multiply(lhs: product, rhs: product, rhsTrans: CblasConjTrans))
+        }
     }
     // print("=======================================================================")
     // print(Matrix.multiply(lhs: product, rhs: product, rhsTrans: CblasConjTrans))
@@ -403,5 +561,40 @@ class QuantumGraphEmbedder {
         return try! circuit.statevector().get()
         // let statevector = try! circuit.statevector().get()
         // return statevector
+    }
+
+    func computeDerivative(subject: [Double], object: [Double]) -> CircuitStatevector {
+        let predicate = Matrix.stackAsGates(
+            [
+                getGateDerivativeMatrix(layers: parameterizedGates, layer: 0, parameter: .gamma, qubit: 0),
+                getGateDerivativeMatrix(layers: parameterizedGates, layer: 1, parameter: .alpha, offset: -1),
+                getGateDerivativeMatrix(layers: parameterizedGates, layer: 2, parameter: .alpha, offset: -2),
+                getGateDerivativeMatrix(layers: parameterizedGates, layer: 3, parameter: .alpha, offset: -3)
+            ]
+        )
+        let U1 = Matrix.multiply(lhs: prepareQubitStates(coefficients: subject), rhs: predicate)
+        let U2 = prepareQubitStates(coefficients: object)
+        let gates: [Gate] = [
+            .hadamard(target: 0),
+            .controlled(
+                gate: .matrix(
+                    matrix: U1,
+                    inputs: (1...nQubits).map{$0}
+                ),
+                controls: [0]
+            ),
+            .not(target: 0),
+            .controlled(
+                gate: .matrix(
+                    matrix: U2,
+                    inputs: (1...nQubits).map{$0}
+                ),
+                controls: [0]
+            ),
+            .not(target: 0),
+            .hadamard(target: 0)
+        ]
+        let circuit = MainCircuitFactory().makeCircuit(gates: gates)
+        return try! circuit.statevector().get()
     }
 }

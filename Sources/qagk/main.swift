@@ -64,16 +64,25 @@ struct Test: ParsableCommand {
 
         // try! print(circuit.statevector().get().vector)
         // try! print(circuit.statevector().get().summarizedProbabilities())
-        let dimensionality = 7
+        let dimensionality = 6
         let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
         let subject: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
         let object: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
-        print(
-            embedder.run(
-                subject: subject,
-                object: object
-            ).vector
-        )
+
+        // let gate = ParameterizedGate()
+        // let matrix = gate.betaDerivativeMatrix
+        // print(Matrix.multiply(lhs: matrix, rhs: matrix, rhsTrans: CblasConjTrans))
+
+        let inferredLabel = try! embedder.run(
+            subject: subject,
+            object: object
+        ).summarizedProbabilities(byQubits: [0]).get()["1"]!
+        print(inferredLabel)
+        let derivative = try! embedder.computeDerivative(
+            subject: subject,
+            object: object
+        ).summarizedProbabilities(byQubits: [0]).get()["1"]!
+        print(derivative)
         // .groupedProbabilities(
         //         byQubits: 0..<dimensionality
         //     )
