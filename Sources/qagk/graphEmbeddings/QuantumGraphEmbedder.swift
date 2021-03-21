@@ -566,22 +566,23 @@ class QuantumGraphEmbedder {
             gamma = 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
              0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .negated, controlVariant: .normal).firstQubitPositiveneStats
         } else {
-            alpha = 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .alpha, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
-                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .alpha, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats
-            beta = 0.5 * (
+            alpha = computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .alpha, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats
+                // 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .alpha, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats
+            beta = 1 * (
                 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
                 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .negated, controlVariant: .normal).firstQubitPositiveneStats
-            ) - 0.5 * (
-                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats +
-                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .negated, controlVariant: .negated).firstQubitPositiveneStats
             )
-            gamma = 0.5 * (
+            // - 0.5 * (
+            //     0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats +
+            //     0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .negated, controlVariant: .negated).firstQubitPositiveneStats
+            // )
+            gamma = 1 * (
                 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
                 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .negated, controlVariant: .normal).firstQubitPositiveneStats
-            ) - 0.5 * (
-                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats +
-                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .negated, controlVariant: .negated).firstQubitPositiveneStats
-            )
+            )// ) - 0.5 * (
+            //     0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats +
+            //     0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .negated, controlVariant: .negated).firstQubitPositiveneStats
+            // )
         }
         return ParameterizedGateGradient(alpha: alpha, beta: beta, gamma: gamma)
     }

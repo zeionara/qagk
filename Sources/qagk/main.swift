@@ -74,8 +74,8 @@ struct Test: ParsableCommand {
         // let matrix = gate.betaDerivativeMatrix
         // print(Matrix.multiply(lhs: matrix, rhs: matrix, rhsTrans: CblasConjTrans))
 
-        let lr = 0.1
-        let nEpochs = 5
+        let lr = 0.03
+        let nEpochs = 20
         for i in 1..<nEpochs {
             print("Running \(i) epoch...")
             let inferredLabel = embedder.run(
@@ -84,14 +84,27 @@ struct Test: ParsableCommand {
             ).firstQubitPositiveneStats
             // print(derivatives)
             print("Inferred label \(inferredLabel)")
-            let derivatives = embedder.computeDerivatives(
-                subject: subject,
-                object: object,
-                layer: 0,
-                qubit: 0
-            )
-            embedder.parameterizedGates[0][0].alpha += (trueLabel - inferredLabel) * lr * derivatives.alpha
+
+            for layer in [0, 3] {
+                for qubit in 0..<embedder.parameterizedGates[layer].count {
+                    let derivatives = embedder.computeDerivatives(
+                        subject: subject,
+                        object: object,
+                        layer: layer,
+                        qubit: qubit
+                    )
+                    embedder.parameterizedGates[layer][qubit].alpha -= (trueLabel - inferredLabel) * lr * derivatives.alpha       
+                    embedder.parameterizedGates[layer][qubit].beta -= (trueLabel - inferredLabel) * lr * derivatives.beta
+                    embedder.parameterizedGates[layer][qubit].gamma -= (trueLabel - inferredLabel) * lr * derivatives.gamma
+                }
+            }
         }
+
+        let inferredLabel = embedder.run(
+            subject: subject,
+            object: object
+        ).firstQubitPositiveneStats
+        print("Inferred label \(inferredLabel)")
 
         // .groupedProbabilities(
         //         byQubits: 0..<dimensionality
