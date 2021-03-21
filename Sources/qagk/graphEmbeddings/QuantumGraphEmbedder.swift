@@ -18,6 +18,11 @@ enum OptimizedParameter {
     case gamma
 }
 
+enum GateVariant {
+    case normal
+    case negated
+}
+
 let IDENTITY = try! Matrix(
     [
         [.one, .zero],
@@ -129,6 +134,10 @@ public extension Matrix {
         let scaledMatrix = Matrix.scale(lhs: self, x: Complex<Double>(1 / sqrt(squaredMatrix[0, 0].real), squaredMatrix[0, 0].imaginary))
         return scaledMatrix
     }
+
+    var squared: Matrix {
+        Matrix.multiply(lhs: self, rhs: self, rhsTrans: CblasConjTrans)
+    }
 }
 
 func getControllingQubit(targetQubit: Int, nQubits: Int, offset: Int) -> Int {
@@ -188,14 +197,23 @@ func getExtendedMatrix(layers: [[ParameterizedGate]], layer: Int, targetQubit: I
     }
 }
 
-func getExtendedDerivativeMatrix(layers: [[ParameterizedGate]], layer: Int, targetQubit: Int, parameter: OptimizedParameter,  controllingQubit: Optional<Int> = .none) -> Matrix {
-    let derivativeMatrix = layers[layer][targetQubit].getDerivativeMatrix(parameter)
+func getExtendedDerivativeMatrix(
+    layers: [[ParameterizedGate]], layer: Int, targetQubit: Int, parameter: OptimizedParameter,
+    variant: GateVariant = .normal, controlVariant: GateVariant = .normal, controllingQubit: Optional<Int> = .none
+) -> Matrix {
+    let derivativeMatrix = layers[layer][targetQubit].getDerivativeMatrix(parameter, variant: variant)
     func makeConditionedOperatorMatrix(controllingQubit: Int, scaler: Optional<Complex<Double>> = .none) -> Matrix {
         let p1Part = Matrix.kronekerProduct(
             matrices: (0..<layers[layer].count).map{i -> Matrix in
                 if i == targetQubit {
                     if let scalerUnwrapped = scaler {
-                        return Matrix.scale(lhs: derivativeMatrix, x: scalerUnwrapped)
+                        // print("Scaling...")
+                        // print("before")
+                        // print(derivativeMatrix)
+                        // print("after")
+                        let scaled = Matrix.scale(lhs: derivativeMatrix, x: scalerUnwrapped)
+                        // print(scaled)
+                        return scaled
                     } else {
                         return derivativeMatrix
                     }
@@ -222,10 +240,10 @@ func getExtendedDerivativeMatrix(layers: [[ParameterizedGate]], layer: Int, targ
     }
     
     if let controllingQubitUnwrapped = controllingQubit {
-        return try! (
-            makeConditionedOperatorMatrix(controllingQubit: controllingQubitUnwrapped) +
-                Matrix.scale(lhs: makeConditionedOperatorMatrix(controllingQubit: controllingQubitUnwrapped, scaler: Complex<Double>(-1, 0)), x: Complex<Double>(-1, 0))
-        ).get().unitary
+        return controlVariant == .normal ? 
+            makeConditionedOperatorMatrix(controllingQubit: controllingQubitUnwrapped) :
+            makeConditionedOperatorMatrix(controllingQubit: controllingQubitUnwrapped, scaler: Complex<Double>(-1, 0))
+        // Matrix.scale(lhs: makeConditionedOperatorMatrix(controllingQubit: controllingQubitUnwrapped, scaler: Complex<Double>(-1, 0)), x: Complex<Double>(-1, 0)
     } else {
         return Matrix.kronekerProduct(
             matrices: (0..<layers[layer].count).map{i -> Matrix in
@@ -268,7 +286,7 @@ func getLayerMatrix(layers: [[ParameterizedGate]], layer: Int, offset: Optional<
             controllingQubit: controllingQubit
         )
         // print(extendedMatrix)
-        product = Matrix.multiply(lhs: product, rhs: extendedMatrix)
+        product = Matrix.stackAsGates([product, extendedMatrix])
         // print("=======================================================================")
         // print(extendedMatrix)
         // print(product)
@@ -280,7 +298,10 @@ func getLayerMatrix(layers: [[ParameterizedGate]], layer: Int, offset: Optional<
     return product
 }
 
-func getGateDerivativeMatrix(layers: [[ParameterizedGate]], layer: Int, parameter: OptimizedParameter, qubit: Optional<Int> = .none, offset: Optional<Int> = .none) -> Matrix {
+func getGateDerivativeMatrix(
+    layers: [[ParameterizedGate]], layer: Int, parameter: OptimizedParameter, variant: GateVariant = .normal, controlVariant: GateVariant = .normal,
+    qubit: Optional<Int> = .none, offset: Optional<Int> = .none
+) -> Matrix {
     let nQubits = layers[layer].count
     var product = makeIdentity(nQubits)
     if let unwrappedQubit = qubit {
@@ -298,10 +319,12 @@ func getGateDerivativeMatrix(layers: [[ParameterizedGate]], layer: Int, paramete
                 layer: layer,
                 targetQubit: i,
                 parameter: parameter,
+                variant: variant,
+                controlVariant: controlVariant,
                 controllingQubit: controllingQubit
             ) : makeIdentity(nQubits)
             // print(extendedMatrix)
-            product = Matrix.multiply(lhs: product, rhs: extendedMatrix)
+            product = Matrix.stackAsGates([product, extendedMatrix])
             // print("=======================================================================")
             // print(extendedMatrix)
             // print(product)
@@ -451,7 +474,15 @@ class QuantumGraphEmbedder {
     }
 
     func run(subject: [Double], object: [Double]) -> CircuitStatevector {
-        let U1 = Matrix.multiply(lhs: prepareQubitStates(coefficients: subject), rhs: predicate)
+        let predicate = Matrix.stackAsGates(
+            [
+                getLayerMatrix(layers: parameterizedGates, layer: 0),
+                getLayerMatrix(layers: parameterizedGates, layer: 1, offset: -1),
+                getLayerMatrix(layers: parameterizedGates, layer: 2, offset: -2),
+                getLayerMatrix(layers: parameterizedGates, layer: 3, offset: -3)
+            ]
+        )
+        let U1 = Matrix.stackAsGates([prepareQubitStates(coefficients: subject), predicate])
         let U2 = prepareQubitStates(coefficients: object)
         let gates: [Gate] = [
             .hadamard(target: 0),
@@ -479,16 +510,26 @@ class QuantumGraphEmbedder {
         // return statevector
     }
 
-    func computeDerivative(subject: [Double], object: [Double]) -> CircuitStatevector {
-        let predicate = Matrix.stackAsGates(
-            [
-                getGateDerivativeMatrix(layers: parameterizedGates, layer: 0, parameter: .gamma, qubit: 0, offset: -1),
-                getGateDerivativeMatrix(layers: parameterizedGates, layer: 1, parameter: .alpha, qubit: 0, offset: -1),
-                getGateDerivativeMatrix(layers: parameterizedGates, layer: 2, parameter: .alpha, offset: -2),
-                getGateDerivativeMatrix(layers: parameterizedGates, layer: 3, parameter: .alpha, offset: -3)
-            ]
+    func computeDerivative(subject: [Double], object: [Double], layer: Int, qubit: Int, parameter: OptimizedParameter, variant: GateVariant = .normal, controlVariant: GateVariant = .normal) -> CircuitStatevector {
+        // let predicate = Matrix.stackAsGates(
+        //     [
+        //         getGateDerivativeMatrix(
+        //             layers: parameterizedGates, layer: layer, parameter: parameter, variant: variant, controlVariant: controlVariant, qubit: qubit, offset: 0
+        //         ),
+        //         getGateDerivativeMatrix(layers: parameterizedGates, layer: 1, parameter: .alpha, offset: -1),
+        //         getGateDerivativeMatrix(layers: parameterizedGates, layer: 2, parameter: .alpha, offset: -2),
+        //         getGateDerivativeMatrix(layers: parameterizedGates, layer: 3, parameter: .alpha, offset: -3)
+        //     ]
+        // )
+        let predicate = getGateDerivativeMatrix(
+            layers: parameterizedGates, layer: layer, parameter: parameter, variant: variant, controlVariant: controlVariant, qubit: qubit, offset: layer == 0 ? .none : -layer
         )
-        let U1 = Matrix.multiply(lhs: prepareQubitStates(coefficients: subject), rhs: predicate)
+        // print(predicate)
+        // print(predicate.squared)
+
+        let U1 = Matrix.stackAsGates([prepareQubitStates(coefficients: subject), predicate])
+        // print(prepareQubitStates(coefficients: subject))
+        // print(U1)
         let U2 = prepareQubitStates(coefficients: object)
         let gates: [Gate] = [
             .hadamard(target: 0),
@@ -512,5 +553,36 @@ class QuantumGraphEmbedder {
         ]
         let circuit = MainCircuitFactory().makeCircuit(gates: gates)
         return try! circuit.statevector().get()
+    }
+
+    func computeDerivatives(subject: [Double], object: [Double], layer: Int, qubit: Int) -> ParameterizedGateGradient {
+        var alpha = 0.0
+        var beta = 0.0
+        var gamma = 0.0
+        if layer == 0 {
+            alpha = computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .alpha, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats
+            beta = 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
+             0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .negated, controlVariant: .normal).firstQubitPositiveneStats
+            gamma = 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
+             0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .negated, controlVariant: .normal).firstQubitPositiveneStats
+        } else {
+            alpha = 0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .alpha, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .alpha, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats
+            beta = 0.5 * (
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .negated, controlVariant: .normal).firstQubitPositiveneStats
+            ) - 0.5 * (
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats +
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .beta, variant: .negated, controlVariant: .negated).firstQubitPositiveneStats
+            )
+            gamma = 0.5 * (
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .negated, controlVariant: .normal).firstQubitPositiveneStats
+            ) - 0.5 * (
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .normal, controlVariant: .negated).firstQubitPositiveneStats +
+                0.5 * computeDerivative(subject: subject, object: object, layer: layer, qubit: qubit, parameter: .gamma, variant: .negated, controlVariant: .negated).firstQubitPositiveneStats
+            )
+        }
+        return ParameterizedGateGradient(alpha: alpha, beta: beta, gamma: gamma)
     }
 }

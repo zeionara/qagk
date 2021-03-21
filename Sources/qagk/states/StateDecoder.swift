@@ -8,4 +8,8 @@ public extension CircuitStatevector {
         }
         return probs.keys.sorted().map{probs[$0]!}
     }
+
+    var firstQubitPositiveneStats: Double {
+        try! self.summarizedProbabilities(byQubits: [0]).get()["1"] ?? 0
+    }
 }

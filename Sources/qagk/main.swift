@@ -68,21 +68,31 @@ struct Test: ParsableCommand {
         let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
         let subject: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
         let object: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
+        let trueLabel = 1.0
 
         // let gate = ParameterizedGate()
         // let matrix = gate.betaDerivativeMatrix
         // print(Matrix.multiply(lhs: matrix, rhs: matrix, rhsTrans: CblasConjTrans))
 
-        let inferredLabel = try! embedder.run(
-            subject: subject,
-            object: object
-        ).summarizedProbabilities(byQubits: [0]).get()["1"]!
-        print(inferredLabel)
-        let derivative = try! embedder.computeDerivative(
-            subject: subject,
-            object: object
-        ).summarizedProbabilities(byQubits: [0]).get()["1"]!
-        print(derivative)
+        let lr = 0.1
+        let nEpochs = 5
+        for i in 1..<nEpochs {
+            print("Running \(i) epoch...")
+            let inferredLabel = embedder.run(
+                subject: subject,
+                object: object
+            ).firstQubitPositiveneStats
+            // print(derivatives)
+            print("Inferred label \(inferredLabel)")
+            let derivatives = embedder.computeDerivatives(
+                subject: subject,
+                object: object,
+                layer: 0,
+                qubit: 0
+            )
+            embedder.parameterizedGates[0][0].alpha += (trueLabel - inferredLabel) * lr * derivatives.alpha
+        }
+
         // .groupedProbabilities(
         //         byQubits: 0..<dimensionality
         //     )
