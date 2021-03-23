@@ -101,14 +101,21 @@ struct Test: ParsableCommand {
         // let inferredLabel = embedder.run(
         //     subjectEntity: 0, relation: 0, objectEntity: 1
         // ).firstQubitPositiveneStats
-        let dummyDataset = Tensor<Int32>(
+        let positiveSamples = Tensor<Int32>(
             [
                 [0, 1, 0],
                 [1, 2, 0]
             ]
         )
-        let inferredLabels = embedder(triples: dummyDataset)
-        print("Inferred label \(inferredLabels)")
+        let negativeSamples = Tensor<Int32>(
+            [
+                [0, 2, 0],
+                [2, 3, 0]
+            ]
+        )
+        train(model: embedder, positiveSamples: positiveSamples, negativeSamples: negativeSamples)
+        // let inferredLabels = embedder(triples: dummyDataset)
+        // print("Inferred label \(inferredLabels)")
 
         // .groupedProbabilities(
         //         byQubits: 0..<dimensionality

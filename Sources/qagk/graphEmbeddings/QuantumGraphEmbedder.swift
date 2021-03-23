@@ -441,12 +441,12 @@ class QuantumGraphEmbedder {
     }
 
     func run(subjectEntity: Int, relation: Int, objectEntity: Int) -> CircuitStatevector {
-        print("obtaining embeddings...")
+        // print("obtaining embeddings...")
         let subject = entityEmbeddings(Tensor<Int32>(Int32(subjectEntity))).unstacked().map{$0.scalar!}
         let object = entityEmbeddings(Tensor<Int32>(Int32(objectEntity))).unstacked().map{$0.scalar!}
         let parameterizedGates = relationshipEmbeddings[relation]
-        print("obtained embeddings")
-        print(parameterizedGates)
+        // print("obtained embeddings")
+        // print(parameterizedGates)
         
         let predicate = Matrix.stackAsGates(
             [
@@ -546,10 +546,11 @@ class QuantumGraphEmbedder {
         return try! circuit.statevector().get()
     }
 
-    func computeDerivatives(subjectEntity: Int, relation: Int, objectEntity: Int, layer: Int, qubit: Int) -> ParameterizedGateGradient {
+    func computeDerivatives(subjectEntity: Int, relation: Int, objectEntity: Int, layer: Int, qubit: Int, multiplier: Float = 1.0) -> ParameterizedGateGradient {
         var alpha = 0.0
         var beta = 0.0
         var gamma = 0.0
+        let multiplierDouble = Double(multiplier)
         if layer == 0 {
             alpha = computeDerivative(subjectEntity: subjectEntity, relation: relation, objectEntity: objectEntity, layer: layer, qubit: qubit, parameter: .alpha, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats
             beta = 0.5 * computeDerivative(subjectEntity: subjectEntity, relation: relation, objectEntity: objectEntity, layer: layer, qubit: qubit, parameter: .beta, variant: .normal, controlVariant: .normal).firstQubitPositiveneStats +
@@ -575,10 +576,29 @@ class QuantumGraphEmbedder {
             //     0.5 * computeDerivative(subjectEntity: subjectEntity, relation: relation, objectEntity: objectEntity, layer: layer, qubit: qubit, parameter: .gamma, variant: .negated, controlVariant: .negated).firstQubitPositiveneStats
             // )
         }
-        return ParameterizedGateGradient(alpha: alpha, beta: beta, gamma: gamma)
+        return ParameterizedGateGradient(alpha: alpha * multiplierDouble, beta: beta * multiplierDouble, gamma: gamma * multiplierDouble)
     }
 
-    // public func callAsFunction(_ triples: Tensor<Int32>) -> Tensor<Float> {
-        
-    // }
+    func computeLosses(triples: Tensor<Int32>, loss: Tensor<Float>, layer: Int, qubit: Int) -> [ParameterizedGateGradient] {
+        let lossUnstacked = loss.unstacked().map{$0.scalar!}
+        return triples.unstacked().enumerated().map{ i, triple in
+            let tripleComponents = triple.unstacked().map{$0.scalar!}
+            let subject = tripleComponents[0]
+            let predicate = tripleComponents[2]
+            let object = tripleComponents[1]
+            return computeDerivatives(subjectEntity: Int(subject), relation: Int(predicate), objectEntity: Int(object), layer: layer, qubit: qubit, multiplier: lossUnstacked[i])
+        }
+    }
+
+    func updateParams(triples: Tensor<Int32>, loss: [ParameterizedGateGradient], lr: Double, layer: Int, qubit: Int) {
+        triples.unstacked().enumerated().map{ i, triple in
+            let tripleUnstacked = triple.unstacked().map{Int($0.scalar!)}
+            
+            relationshipEmbeddings[tripleUnstacked[2]][layer][qubit].alpha -= lr * loss[i].alpha       
+            relationshipEmbeddings[tripleUnstacked[2]][layer][qubit].beta -= lr * loss[i].beta
+            relationshipEmbeddings[tripleUnstacked[2]][layer][qubit].gamma -= lr * loss[i].gamma
+        }
+    }
 }
+
+
