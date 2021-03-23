@@ -64,47 +64,51 @@ struct Test: ParsableCommand {
 
         // try! print(circuit.statevector().get().vector)
         // try! print(circuit.statevector().get().summarizedProbabilities())
-        let dimensionality = 6
-        let embedder = QuantumGraphEmbedder(dimensionality: dimensionality)
-        let subject: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
-        let object: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
+        let dimensionality = 64
+        let embedder = QuantumGraphEmbedder(dimensionality: dimensionality, nEntities: 4, nRelationships: 2)
+        // let subject: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
+        // let object: [Double] = (0..<Int(pow(2.0, Double(dimensionality)))).map{x in Double.random(in: 0..<1)}
         let trueLabel = 1.0
 
         // let gate = ParameterizedGate()
         // let matrix = gate.betaDerivativeMatrix
         // print(Matrix.multiply(lhs: matrix, rhs: matrix, rhsTrans: CblasConjTrans))
 
-        let lr = 0.03
-        let nEpochs = 20
-        for i in 1..<nEpochs {
-            print("Running \(i) epoch...")
-            let inferredLabel = embedder.run(
-                subject: subject,
-                object: object
-            ).firstQubitPositiveneStats
-            // print(derivatives)
-            print("Inferred label \(inferredLabel)")
+        // let lr = 0.03
+        // let nEpochs = 20
+        // for i in 1..<nEpochs {
+        //     print("Running \(i) epoch...")
+        //     let inferredLabel = embedder.run(
+        //         subjectEntity: 0, relation: 0, objectEntity: 1
+        //     ).firstQubitPositiveneStats
+        //     // print(derivatives)
+        //     print("Inferred label \(inferredLabel)")
 
-            for layer in [0, 3] {
-                for qubit in 0..<embedder.parameterizedGates[layer].count {
-                    let derivatives = embedder.computeDerivatives(
-                        subject: subject,
-                        object: object,
-                        layer: layer,
-                        qubit: qubit
-                    )
-                    embedder.parameterizedGates[layer][qubit].alpha -= (trueLabel - inferredLabel) * lr * derivatives.alpha       
-                    embedder.parameterizedGates[layer][qubit].beta -= (trueLabel - inferredLabel) * lr * derivatives.beta
-                    embedder.parameterizedGates[layer][qubit].gamma -= (trueLabel - inferredLabel) * lr * derivatives.gamma
-                }
-            }
-        }
+        //     for layer in [0, 3] {
+        //         for qubit in 0..<embedder.relationshipEmbeddings[0][layer].count {
+        //             let derivatives = embedder.computeDerivatives(
+        //                 subjectEntity: 0, relation: 0, objectEntity: 1,
+        //                 layer: layer,
+        //                 qubit: qubit
+        //             )
+        //             embedder.relationshipEmbeddings[0][layer][qubit].alpha -= (trueLabel - inferredLabel) * lr * derivatives.alpha       
+        //             embedder.relationshipEmbeddings[0][layer][qubit].beta -= (trueLabel - inferredLabel) * lr * derivatives.beta
+        //             embedder.relationshipEmbeddings[0][layer][qubit].gamma -= (trueLabel - inferredLabel) * lr * derivatives.gamma
+        //         }
+        //     }
+        // }
 
-        let inferredLabel = embedder.run(
-            subject: subject,
-            object: object
-        ).firstQubitPositiveneStats
-        print("Inferred label \(inferredLabel)")
+        // let inferredLabel = embedder.run(
+        //     subjectEntity: 0, relation: 0, objectEntity: 1
+        // ).firstQubitPositiveneStats
+        let dummyDataset = Tensor<Int32>(
+            [
+                [0, 1, 0],
+                [1, 2, 0]
+            ]
+        )
+        let inferredLabels = embedder(triples: dummyDataset)
+        print("Inferred label \(inferredLabels)")
 
         // .groupedProbabilities(
         //         byQubits: 0..<dimensionality

@@ -1,4 +1,5 @@
 import Foundation
+import TensorFlow
 
 public func computeL2Norm(data: [Double]) -> Double {
     return sqrt(data.reduce(0, {x, y in x + pow(y, 2)}))
@@ -21,4 +22,25 @@ public extension Array where Element == Double {
         }
         return result
     }
+}
+
+public func computeTensorL2Norm(data: Tensor<Double>) -> Tensor<Double> {
+    sqrt((data * data).sum(alongAxes: [1]))
+}
+
+public func normalizeTensorWithL2(tensor: Tensor<Double>) -> Tensor<Double> {
+    tensor / computeTensorL2Norm(data: tensor)
+}
+
+public func initEmbeddings(dimensionality: Int, nItems: Int, device device_: Device) -> Embedding<Double> {
+    Embedding(
+            embeddings: normalizeTensorWithL2(
+                    tensor: Tensor<Double>(
+                            randomUniform: [nItems, dimensionality],
+                            lowerBound: Tensor(Double(0.0), on: device_),
+                            upperBound: Tensor(Double(1.0) / Double(dimensionality), on: device_),
+                            on: device_
+                    )
+            )
+    )
 }
